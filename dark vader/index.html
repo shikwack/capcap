@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Mobile LPG Cap Detector</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    :root {
+      --brand-blue: #02163c;
+      --brand-orange: #ff6607;
+      --white: #fff;
+      --grey: #f1f1f1;
+      --green: #2e7d32;
+      --red: #b71c1c;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--brand-orange);
+      color: #333;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--brand-blue);
+      padding: .5em;
+      text-align: center;
+    }
+    header h1 {
+      color: #fff;
+      font-size: 1.2em;
+    }
+    main {
+      background: var(--white);
+      margin: 1em;
+      padding: 1em;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    input[type="file"] {
+      display: block;
+      margin: 0.5em auto;
+      font-size: 1em;
+    }
+    button {
+      background: var(--brand-blue);
+      color: #fff;
+      border: none;
+      padding: .6em 1.2em;
+      border-radius: 6px;
+      font-size: 1em;
+      cursor: pointer;
+      margin-top: .5em;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    #status-box {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 1em;
+    }
+    .status-item {
+      background: var(--grey);
+      border-radius: 8px;
+      flex: 1;
+      margin: 0 .3em;
+      padding: .6em;
+    }
+    .status-item span.count {
+      display: block;
+      font-size: 1.4em;
+      font-weight: bold;
+    }
+    .status-item.capped { color: var(--green); }
+    .status-item.uncapped { color: var(--red); }
+
+    #thumbnails {
+      background: var(--white);
+      margin: 1em;
+      padding: 1em;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    #thumbnails h2 {
+      color: var(--brand-blue);
+      font-size: 1.1em;
+      margin-bottom: .8em;
+      text-align:center;
+    }
+    #thumbs-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .8em;
+    }
+    .thumb {
+      width: 90px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fafafa;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .thumb img {
+      width: 100%;
+      display: block;
+    }
+    .thumb p {
+      margin: 0;
+      padding: .3em 0;
+      font-size: .8em;
+    }
+    .thumb p.cap { color: var(--green); }
+    .thumb p.no-cap { color: var(--red); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📱 LPG Cap Detector</h1>
+  </header>
+
+  <main>
+    <!-- file input that triggers camera on mobile -->
+    <input
+      type="file"
+      id="fileInput"
+      accept="image/*"
+      capture="environment"
+      multiple
+    />
+    <button id="scanBtn">Scan Photos</button>
+
+    <div id="status-box">
+      <div class="status-item capped">
+        <span class="count" id="capCount">0</span>
+        with cap
+      </div>
+      <div class="status-item uncapped">
+        <span class="count" id="noCapCount">0</span>
+        without cap
+      </div>
+    </div>
+  </main>
+
+  <section id="thumbnails" style="display:none;">
+    <h2>Results & White %</h2>
+    <div id="thumbs-list"></div>
+  </section>
+
+  <script>
+    const fileInput  = document.getElementById('fileInput');
+    const scanBtn    = document.getElementById('scanBtn');
+    const capCountEl = document.getElementById('capCount');
+    const noCapEl    = document.getElementById('noCapCount');
+    const thumbsSection = document.getElementById('thumbnails');
+    const thumbsList    = document.getElementById('thumbs-list');
+
+    scanBtn.addEventListener('click', () => {
+      const files = Array.from(fileInput.files);
+      if (!files.length) {
+        alert('Select at least one photo.');
+        return;
+      }
+      // reset
+      capCountEl.textContent = '…';
+      noCapEl.textContent  = '…';
+      thumbsList.innerHTML = '';
+      thumbsSection.style.display = 'none';
+
+      Promise.all(files.map(f => processFile(f)))
+        .then(results => {
+          let capCount = 0, noCapCount = 0;
+          results.forEach(({ imgURL, pctWhite }) => {
+            const has = pctWhite > 2.3;
+            if (has) capCount++; else noCapCount++;
+
+            // make a thumbnail
+            const d = document.createElement('div');
+            d.className = 'thumb';
+            const im = document.createElement('img');
+            im.src = imgURL;
+            d.appendChild(im);
+            const p = document.createElement('p');
+            p.innerText = pctWhite.toFixed(1) + '% white';
+            p.className = has ? 'cap' : 'no-cap';
+            d.appendChild(p);
+            thumbsList.appendChild(d);
+          });
+
+          // show counts
+          capCountEl.textContent = capCount;
+          noCapEl.textContent    = noCapCount;
+          thumbsSection.style.display = 'block';
+        });
+    });
+
+    function processFile(file) {
+      return new Promise(res => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.src = url;
+        img.onload = () => {
+          const w = img.width, h = img.height;
+          // draw to offscreen canvas
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          // center‐circle detection
+          const cx = w/2, cy = h/2, r = Math.min(w,h)/6;
+          const data = ctx.getImageData(0,0,w,h).data;
+          let white=0, total=0;
+          for (let dy=-r; dy<=r; dy++){
+            const y = cy+dy|0; if (y<0||y>=h) continue;
+            for (let dx=-r; dx<=r; dx++){
+              const x = cx+dx|0; if (x<0||x>=w) continue;
+              if (dx*dx+dy*dy>r*r) continue;
+              total++;
+              const i = (y*w+x)*4;
+              const b = (data[i]+data[i+1]+data[i+2])/3;
+              if (b>200) white++;
+            }
+          }
+          const pctWhite = total ? (white/total*100) : 0;
+          URL.revokeObjectURL(url);
+          res({ imgURL: url, pctWhite });
+        };
+        img.onerror = () => res({ imgURL: '', pctWhite:0 });
+      });
+    }
+  </script>
+
+</body>
+</html>
