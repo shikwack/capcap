@@ -1,235 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <title>Mobile LPG Cap Detector</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Auto-Capture LPG Detector w/ Counters</title>
   <style>
-    :root {
-      --brand-blue: #02163c;
-      --brand-orange: #ff6607;
-      --white: #fff;
-      --grey: #f1f1f1;
-      --green: #2e7d32;
-      --red: #b71c1c;
-    }
-    * { box-sizing: border-box; margin:0; padding:0; }
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: var(--brand-orange);
-      color: #333;
-      min-height: 100vh;
-    }
-    header {
-      background: var(--brand-blue);
-      padding: .5em;
+      font-family: sans-serif;
+      margin: 0;
+      background: #ff6607;
+      color: #02163c;
       text-align: center;
-    }
-    header h1 {
-      color: #fff;
-      font-size: 1.2em;
-    }
-    main {
-      background: var(--white);
-      margin: 1em;
       padding: 1em;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      text-align: center;
     }
-    input[type="file"] {
-      display: block;
-      margin: 0.5em auto;
-      font-size: 1em;
-    }
+    h1 { margin: .5em 0 .2em; }
     button {
-      background: var(--brand-blue);
-      color: #fff;
-      border: none;
+      margin: .5em;
       padding: .6em 1.2em;
-      border-radius: 6px;
       font-size: 1em;
+      border-radius: 6px;
+      border: none;
+      background: #02163c;
+      color: #fff;
       cursor: pointer;
-      margin-top: .5em;
     }
-    button:disabled { opacity: .5; cursor: default; }
-    #status-box {
+    button:disabled { opacity: .5; }
+
+    /* Counter box */
+    #counterBox {
       display: flex;
-      justify-content: space-around;
-      margin-top: 1em;
+      justify-content: center;
+      gap: 2em;
+      margin: 1em 0;
     }
-    .status-item {
-      background: var(--grey);
+    .counter {
+      background: #fff3e0;
+      padding: .8em 1.5em;
       border-radius: 8px;
-      flex: 1;
-      margin: 0 .3em;
-      padding: .6em;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    .status-item span.count {
+    .counter span.num {
       display: block;
       font-size: 1.4em;
       font-weight: bold;
     }
-    .status-item.capped { color: var(--green); }
-    .status-item.uncapped { color: var(--red); }
+    .counter.with-cap { color: green; }
+    .counter.without-cap { color: red; }
 
-    #thumbnails {
-      background: var(--white);
-      margin: 1em;
-      padding: 1em;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    .container { position: relative; display: inline-block; }
+    video, canvas {
+      max-width: 90vw;
+      border-radius: 10px;
+      margin: .5em 0;
     }
-    #thumbnails h2 {
-      color: var(--brand-blue);
-      font-size: 1.1em;
-      margin-bottom: .8em;
-      text-align:center;
-    }
-    #thumbs-list {
+    #overlay { position: absolute; top:0; left:0; pointer-events:none; }
+    #status { font-weight: bold; margin-top: .8em; }
+
+    #results {
+      margin-top: 1em;
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
       gap: .8em;
+      justify-content: center;
     }
     .thumb {
-      width: 90px;
+      width: 100px;
+      background: #fff3e0;
       border-radius: 8px;
       overflow: hidden;
-      background: #fafafa;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       text-align: center;
     }
-    .thumb img {
-      width: 100%;
-      display: block;
-    }
-    .thumb p {
-      margin: 0;
-      padding: .3em 0;
-      font-size: .8em;
-    }
-    .thumb p.cap { color: var(--green); }
-    .thumb p.no-cap { color: var(--red); }
+    .thumb img { width: 100%; display: block; }
+    .thumb p { margin: 0; padding: .3em; font-size: .8em; }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>📱 LPG Cap Detector</h1>
-  </header>
+  <h1>📷 Auto-Capture LPG Detector</h1>
 
-  <main>
-    <!-- file input that triggers camera on mobile -->
-    <input
-      type="file"
-      id="fileInput"
-      accept="image/*"
-      capture="environment"
-      multiple
-    />
-    <button id="scanBtn">Scan Photos</button>
+  <button id="start">Start Live</button>
+  <button id="stop" disabled>Stop</button>
 
-    <div id="status-box">
-      <div class="status-item capped">
-        <span class="count" id="capCount">0</span>
-        with cap
-      </div>
-      <div class="status-item uncapped">
-        <span class="count" id="noCapCount">0</span>
-        without cap
-      </div>
+  <div id="counterBox">
+    <div class="counter with-cap">
+      <span class="num" id="capCount">0</span>
+      Cylinders with Cap
     </div>
-  </main>
+    <div class="counter without-cap">
+      <span class="num" id="noCapCount">0</span>
+      Cylinders without Cap
+    </div>
+  </div>
 
-  <section id="thumbnails" style="display:none;">
-    <h2>Results & White %</h2>
-    <div id="thumbs-list"></div>
-  </section>
+  <div class="container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="status">Idle</div>
+
+  <h2>Captured LPG Frames</h2>
+  <div id="results"></div>
 
   <script>
-    const fileInput  = document.getElementById('fileInput');
-    const scanBtn    = document.getElementById('scanBtn');
-    const capCountEl = document.getElementById('capCount');
-    const noCapEl    = document.getElementById('noCapCount');
-    const thumbsSection = document.getElementById('thumbnails');
-    const thumbsList    = document.getElementById('thumbs-list');
+    const startBtn = document.getElementById('start');
+    const stopBtn  = document.getElementById('stop');
+    const video    = document.getElementById('video');
+    const overlay  = document.getElementById('overlay');
+    const status   = document.getElementById('status');
+    const results  = document.getElementById('results');
+    const capCountEl   = document.getElementById('capCount');
+    const noCapCountEl = document.getElementById('noCapCount');
 
-    scanBtn.addEventListener('click', () => {
-      const files = Array.from(fileInput.files);
-      if (!files.length) {
-        alert('Select at least one photo.');
-        return;
+    let stream, rafId;
+    let lastState = null;       // last detection: true=cap, false=no cap
+    let capCount = 0, noCapCount = 0;
+    let lastCaptureTime = 0;
+    const debounceMs = 2000;     // don't re-count the same cylinder
+
+    // Detection in central circle
+    function detect(ctx, w, h) {
+      const cx = w/2, cy = h/2, r = Math.min(w,h)/6;
+      const data = ctx.getImageData(0,0,w,h).data;
+      let white=0, total=0;
+      for (let dy=-r; dy<=r; dy++){
+        const y = cy+dy|0; if (y<0||y>=h) continue;
+        for (let dx=-r; dx<=r; dx++){
+          const x = cx+dx|0; if (x<0||x>=w) continue;
+          if (dx*dx+dy*dy>r*r) continue;
+          total++;
+          const i = (y*w + x)*4;
+          const b = (data[i]+data[i+1]+data[i+2])/3;
+          if (b>200) white++;
+        }
       }
-      // reset
-      capCountEl.textContent = '…';
-      noCapEl.textContent  = '…';
-      thumbsList.innerHTML = '';
-      thumbsSection.style.display = 'none';
-
-      Promise.all(files.map(f => processFile(f)))
-        .then(results => {
-          let capCount = 0, noCapCount = 0;
-          results.forEach(({ imgURL, pctWhite }) => {
-            const has = pctWhite > 2.3;
-            if (has) capCount++; else noCapCount++;
-
-            // make a thumbnail
-            const d = document.createElement('div');
-            d.className = 'thumb';
-            const im = document.createElement('img');
-            im.src = imgURL;
-            d.appendChild(im);
-            const p = document.createElement('p');
-            p.innerText = pctWhite.toFixed(1) + '% white';
-            p.className = has ? 'cap' : 'no-cap';
-            d.appendChild(p);
-            thumbsList.appendChild(d);
-          });
-
-          // show counts
-          capCountEl.textContent = capCount;
-          noCapEl.textContent    = noCapCount;
-          thumbsSection.style.display = 'block';
-        });
-    });
-
-    function processFile(file) {
-      return new Promise(res => {
-        const img = new Image();
-        const url = URL.createObjectURL(file);
-        img.src = url;
-        img.onload = () => {
-          const w = img.width, h = img.height;
-          // draw to offscreen canvas
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          const ctx = c.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-
-          // center‐circle detection
-          const cx = w/2, cy = h/2, r = Math.min(w,h)/6;
-          const data = ctx.getImageData(0,0,w,h).data;
-          let white=0, total=0;
-          for (let dy=-r; dy<=r; dy++){
-            const y = cy+dy|0; if (y<0||y>=h) continue;
-            for (let dx=-r; dx<=r; dx++){
-              const x = cx+dx|0; if (x<0||x>=w) continue;
-              if (dx*dx+dy*dy>r*r) continue;
-              total++;
-              const i = (y*w+x)*4;
-              const b = (data[i]+data[i+1]+data[i+2])/3;
-              if (b>200) white++;
-            }
-          }
-          const pctWhite = total ? (white/total*100) : 0;
-          URL.revokeObjectURL(url);
-          res({ imgURL: url, pctWhite });
-        };
-        img.onerror = () => res({ imgURL: '', pctWhite:0 });
-      });
+      const pct = total? (white/total*100) : 0;
+      return { present: pct>2.3, pct };
     }
-  </script>
 
+    // Snapshot & thumbnail
+    function capture(ctx, w, h, pct) {
+      const snap = document.createElement('canvas');
+      snap.width = w; snap.height = h;
+      snap.getContext('2d').drawImage(video, 0, 0, w, h);
+      const url = snap.toDataURL('image/jpeg',0.8);
+
+      const div = document.createElement('div');
+      div.className = 'thumb';
+      div.innerHTML = `
+        <img src="${url}">
+        <p>${pct.toFixed(1)}% white</p>
+      `;
+      results.appendChild(div);
+    }
+
+    function loop() {
+      const w = video.videoWidth, h = video.videoHeight;
+      overlay.width = w; overlay.height = h;
+      const ctx = overlay.getContext('2d');
+      ctx.clearRect(0,0,w,h);
+      ctx.drawImage(video, 0, 0, w, h);
+
+      const { present, pct } = detect(ctx, w, h);
+      // draw circle
+      ctx.beginPath();
+      ctx.arc(w/2, h/2, Math.min(w,h)/6, 0,2*Math.PI);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = present ? 'limegreen' : 'crimson';
+      ctx.stroke();
+
+      status.textContent = present
+        ? `✅ Cap (${pct.toFixed(1)}%)`
+        : `❌ No Cap (${pct.toFixed(1)}%)`;
+
+      // count on state change + debounce
+      const now = Date.now();
+      if (present !== lastState && now - lastCaptureTime > debounceMs) {
+        if (present) {
+          capCount++;
+          capCountEl.textContent = capCount;
+        } else {
+          noCapCount++;
+          noCapCountEl.textContent = noCapCount;
+        }
+        lastCaptureTime = now;
+        capture(ctx, w, h, pct);
+      }
+      lastState = present;
+
+      rafId = requestAnimationFrame(loop);
+    }
+
+    startBtn.onclick = async () => {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      video.srcObject = stream;
+      startBtn.disabled = true;
+      stopBtn.disabled  = false;
+      status.textContent = '🔍 Detecting…';
+      await video.play();
+      loop();
+    };
+
+    stopBtn.onclick = () => {
+      cancelAnimationFrame(rafId);
+      stream.getTracks().forEach(t => t.stop());
+      startBtn.disabled = false;
+      stopBtn.disabled  = true;
+      status.textContent = 'Stopped';
+    };
+  </script>
 </body>
 </html>
